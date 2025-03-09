@@ -1,3 +1,4 @@
+import os
 from typing import Dict, List, Optional
 import nest_asyncio
 from pydantic import BaseModel, Field
@@ -7,9 +8,10 @@ from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.providers.openai import OpenAIProvider
 import requests
 from datetime import datetime
-
+from dotenv import load_dotenv
 
 nest_asyncio.apply()
+load_dotenv()
 
 # Define Pydantic models for the API response
 class PlayerProjection(BaseModel):
@@ -29,7 +31,7 @@ class PlayerProjection(BaseModel):
 class AgentDependencies(BaseModel):
     api_base_url: str = "http://localhost:8000"
 
-model = AnthropicModel('claude-3-7-sonnet-latest', api_key='key')
+model = AnthropicModel('claude-3-7-sonnet-latest', api_key=os.getenv('ANTHROPIC_API_KEY'))
 
 # model = OpenAIModel('gpt-4o', provider=OpenAIProvider(api_key='key'))
 
