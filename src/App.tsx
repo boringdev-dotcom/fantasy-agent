@@ -335,10 +335,11 @@ const parseMarkdown = (text: string): string => {
     // Italic
     .replace(/\*([\s\S]*?)\*/g, '<em>$1</em>')
     
-    // Lists
-    .replace(/^\s*-\s+(.*?)$/gm, '<li>$1</li>')
-    .replace(/<li>(.*?)<\/li>(\s*<li>)/g, '<li>$1</li><ul>$2')
-    .replace(/(<\/li>\s*)<\/ul>\s*$/g, '$1')
+    // Horizontal rule
+    .replace(/^([-=])\1{2,}$/gm, '<hr>')
+    
+    // Emojis - preserve them
+    .replace(/([🏀📊📈🔥⚡️🌟✨⭐️])/g, '<span style="font-size: 1.2em;">$1</span>')
     
     // Headers
     .replace(/^### (.*?)$/gm, '<h3>$1</h3>')
@@ -348,8 +349,48 @@ const parseMarkdown = (text: string): string => {
     // Links
     .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: none;">$1</a>')
     
-    // Line breaks
-    .replace(/\n/g, '<br>');
+    // Blockquotes
+    .replace(/^>\s+(.*?)$/gm, '<blockquote>$1</blockquote>');
+  
+  // Handle line breaks before list processing to avoid gaps
+  processed = processed
+    // Convert double line breaks to a special marker
+    .replace(/\n\n/g, '<br class="paragraph-break">')
+    // Convert single line breaks to a different marker
+    .replace(/\n/g, '<br class="line-break">');
+  
+  // Special handling for projection-style formatting
+  processed = processed
+    // Make headers and section titles stand out
+    .replace(/<br class="line-break">(📊.*?📊)<br class="line-break">/g, 
+      '<div style="font-size: 1.3em; font-weight: bold; color: #4f46e5; margin: 10px 0; text-align: center;">$1</div>')
+    
+    .replace(/<br class="line-break">(🏀.*?:)<br class="line-break">/g, 
+      '<div style="font-size: 1.1em; font-weight: bold; color: #2563eb; margin: 8px 0 4px 0;">$1</div>')
+    
+    .replace(/<br class="line-break">(📈.*?:)<br class="line-break">/g, 
+      '<div style="font-size: 1.1em; font-weight: bold; color: #059669; margin: 8px 0 4px 0;">$1</div>')
+    
+    // Format stat categories with proper spacing
+    .replace(/<br class="line-break">\s*([A-Z]+):\s*<br class="line-break">/g, 
+      '<div style="font-weight: bold; color: #4b5563; margin: 8px 0 4px 0;">$1:</div>')
+    
+    // Improved list handling - convert bullet points to styled divs
+    .replace(/(<br class="line-break">)\s*[•-]\s+(.*?)(?=<br class="line-break">|$)/g, 
+      '<div style="display: flex; margin: 4px 0 4px 12px;"><span style="margin-right: 8px;">•</span><span>$2</span></div>')
+    
+    // Improve stat line formatting with specific pattern for projections
+    .replace(/(<br class="line-break">)\s*•\s+([\d.]+)\s+-\s+(.*?)(?=<br class="line-break">|$)/g, 
+      '<div style="display: flex; margin: 4px 0 4px 12px;"><span style="font-weight: bold; min-width: 50px;">$2</span><span>$3</span></div>')
+    
+    // Format stat categories
+    .replace(/(POINTS|REBOUNDS|ASSISTS|STEALS|BLOCKS|THREE POINTERS):/g, 
+      '<div style="font-weight: bold; color: #4b5563; margin: 8px 0 4px 0;">$1:</div>');
+  
+  // Convert the special markers back to appropriate HTML
+  processed = processed
+    .replace(/<br class="paragraph-break">/g, '<div style="margin: 12px 0;"></div>')
+    .replace(/<br class="line-break">/g, '<div style="margin: 2px 0;"></div>');
   
   return processed;
 };
