@@ -29,9 +29,9 @@ class PlayerProjection(BaseModel):
 class AgentDependencies(BaseModel):
     api_base_url: str = "http://localhost:8000"
 
-# model = AnthropicModel('claude-3-7-sonnet-latest', api_key='key')
+model = AnthropicModel('claude-3-7-sonnet-latest', api_key='key')
 
-model = OpenAIModel('gpt-4o', provider=OpenAIProvider(api_key='key'))
+# model = OpenAIModel('gpt-4o', provider=OpenAIProvider(api_key='key'))
 
 
 # model = OpenAIModel(
@@ -87,20 +87,3 @@ def get_projections(ctx: RunContext[AgentDependencies], player_name: str) -> str
         return result
     except Exception as e:
         return f"Error fetching projections for {player_name}: {str(e)}"
-
-# Main function to run the agent
-def run_agent(query: str, deps: Optional[AgentDependencies] = None) -> str:
-    """Run the agent with the given query
-    
-    Args:
-        query: The user's query
-        deps: Optional dependencies to pass to the agent
-    
-    Returns:
-        The agent's response
-    """
-    if deps is None:
-        deps = AgentDependencies()
-    
-    response = agent.run_sync(query, deps=deps)
-    return response.data
