@@ -109,45 +109,83 @@ model = AnthropicModel('claude-3-7-sonnet-latest', api_key=os.getenv('ANTHROPIC_
 #     ),
 # )
 
-agent = Agent(
-    model=model,
-    deps_type=AgentDependencies,
-    retries=3,
-    system_prompt=(
-        "You are a helpful fantasy basketball assistant. "
-        "You can help users find information about NBA players, their stats, and projections. "
-        "When users ask about players, use the get_projections tool to fetch the latest data. "
-        "When users ask about player details or statistics, follow these steps:\n"
+prompt = (
+    "You are an intelligent fantasy sports agent. You can talk about any sports but nothing else. "
+    "Help users analyze player projections and make informed decisions for their fantasy teams. "
+    "Always greet the customer and provide a helpful response. "
+    "You can fetch projections using the get_projections tool with any of these parameters: "
+    "player_name, stat_type (e.g., 'points', 'rebounds', 'shots', 'assists'), or sport_id (e.g., 7 for NBA, 82 for Soccer). "
+    "At least one parameter must be provided. For example, you can get all NBA projections, all projections for a specific player, or all 'points' projections across sports."
+    "When users ask about player details or statistics, follow these steps:\n"
         "1. First use the get_player_details_for_stats tool with the player's first and last name to find their information and ID\n"
         "2. Then use the get_player_stats tool with that ID to fetch their detailed statistics for the current season\n"
         "3. If either tool returns an error, clearly explain what happened and provide the information you were able to retrieve\n"
         "4. Always include the player ID in your response when available, as it's needed for fetching stats\n"
         "5. If the stats API returns an error, suggest trying again or checking if the player is active in the current season"
-    ),
+)
+
+agent = Agent(
+    model=model,
+    deps_type=AgentDependencies,
+    retries=3,
+    system_prompt=prompt
 )
 
 @agent.tool
-def get_projections(ctx: RunContext[AgentDependencies], player_name: str) -> str:
-    """Get the projections for a player by making an API call
+def get_projections(
+    ctx: RunContext[AgentDependencies], 
+    player_name: Optional[str] = None,
+    stat_type: Optional[str] = None,
+    sport_id: Optional[int] = None
+) -> str:
+    """Get the projections for players by making an API call
     
     Args:
         ctx: The run context containing dependencies
-        player_name: The name of the player to get projections for
+        player_name: Optional name of the player to get projections for
+        stat_type: Optional filter for specific stat type (e.g., "points", "rebounds", "assists", "shots")
+        sport_id: Optional filter for specific sport ID (e.g., 7 for NBA, 82 for Soccer)
+        
+    Note: At least one parameter (player_name, stat_type, or sport_id) must be provided.
+    Important: Use the exact sport_id values provided by the user. NBA is sport_id 7, and Soccer is sport_id 82. Do not substitute these values.
     """
     
+    # Validate that at least one parameter is provided
+    if player_name is None and stat_type is None and sport_id is None:
+        return "Error: At least one parameter (player_name, stat_type, or sport_id) must be provided."
+    
+    filter_msg = []
+    if player_name:
+       filter_msg.append(f"player '{player_name}'")
+    if stat_type:
+        filter_msg.append(f"stat type '{stat_type}'")
+    if sport_id:
+        filter_msg.append(f"sport ID {sport_id}")
+    filter_str = ", ".join(filter_msg)
+
     try:
-        print(f"Getting projections for {player_name}")
+        # Build query parameters including only the provided filters
+        params = {}
+        if player_name is not None:
+            params["player_name"] = player_name
+        if stat_type is not None:
+            params["stat_type"] = stat_type
+        if sport_id is not None:
+            params["sport_id"] = sport_id
+            
+        print(f"Getting projections with params: {params}")
         api_url = f"{ctx.deps.api_base_url}/api/projections"
-        response = requests.get(api_url, params={"player_name": player_name})
+        response = requests.get(api_url, params=params)
         response.raise_for_status()  # Raise an exception for 4XX/5XX responses
         
         data = response.json()
+        print(f"Response data: {data}")
         
         # Parse the response into PlayerProjection objects
         projections = [PlayerProjection(**item) for item in data]
         
         if not projections:
-            return f"No projections found for {player_name}."
+            return f"No projections found for {filter_str}."
         
         # Format the response in a more readable and visually appealing way
         result = f"📊 PROJECTIONS FOR {player_name.upper()} 📊\n"
@@ -184,10 +222,9 @@ def get_projections(ctx: RunContext[AgentDependencies], player_name: str) -> str
                     if proj.opponent:
                         result += f" vs {proj.opponent}"
                     result += f" ({'Active' if proj.is_active else 'Inactive'})\n"
-        
         return result
-    except Exception as e:
-        return f"Error fetching projections for {player_name}: {str(e)}"
+    except Exception as e:       
+        return f"Error fetching projections for {filter_str}: {str(e)}"
     
 @agent.tool 
 def get_player_details_for_stats(ctx: RunContext[AgentDependencies], first_name: str, last_name: str) -> str:
