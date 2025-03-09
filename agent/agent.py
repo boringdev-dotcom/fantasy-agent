@@ -149,13 +149,41 @@ def get_projections(ctx: RunContext[AgentDependencies], player_name: str) -> str
         if not projections:
             return f"No projections found for {player_name}."
         
-        # Format the response in a readable way
-        result = f"Projections for {player_name}:\n"
+        # Format the response in a more readable and visually appealing way
+        result = f"📊 PROJECTIONS FOR {player_name.upper()} 📊\n"
+        result += f"{'=' * 40}\n\n"
+        
+        # Group projections by stat type for better organization
+        stat_projections = {}
         for proj in projections:
-            result += f"- {proj.stat_type}: {proj.line_score} ({proj.description})\n"
-            result += f"  Game starts: {proj.start_time.strftime('%Y-%m-%d %H:%M')}\n"
-            if proj.opponent:
-                result += f"  Opponent: {proj.opponent}\n"
+            if proj.stat_type not in stat_projections:
+                stat_projections[proj.stat_type] = []
+            stat_projections[proj.stat_type].append(proj)
+        
+        # Display game information once if all projections are for the same game
+        if len(set(p.game_id for p in projections)) == 1:
+            game_info = projections[0]
+            result += f"🏀 GAME INFO:\n"
+            result += f"   Date: {game_info.start_time.strftime('%A, %B %d, %Y')}\n"
+            result += f"   Time: {game_info.start_time.strftime('%I:%M %p')}\n"
+            if game_info.opponent:
+                result += f"   Opponent: {game_info.opponent}\n"
+            result += f"   Status: {'Active' if game_info.is_active else 'Inactive'}\n\n"
+        
+        result += f"📈 PROJECTED STATS:\n"
+        
+        # Display projections by category
+        for stat_type, projs in stat_projections.items():
+            result += f"\n   {stat_type.upper()}:\n"
+            for proj in projs:
+                result += f"   • {proj.line_score:.1f} - {proj.description}\n"
+                
+                # Only show game info if we have multiple games
+                if len(set(p.game_id for p in projections)) > 1:
+                    result += f"     Game: {proj.start_time.strftime('%a, %b %d')} at {proj.start_time.strftime('%I:%M %p')}"
+                    if proj.opponent:
+                        result += f" vs {proj.opponent}"
+                    result += f" ({'Active' if proj.is_active else 'Inactive'})\n"
         
         return result
     except Exception as e:
