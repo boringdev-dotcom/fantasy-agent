@@ -59,12 +59,13 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 message_history=messages
             )
 
-            print(result.all_messages())
-            print(result.cost())
-
             messages.append(ModelRequest(parts=[UserPromptPart(content=data)]))
+            response = {
+                "text": result.data,
+                "sources": []
+              }
             
-            await manager.send_message(session_id, result.data)
+            await manager.send_message(session_id, json.dumps(response))
             messages.append(ModelResponse(parts=[TextPart(content=result.data)]))
     except WebSocketDisconnect:
         manager.disconnect(session_id)
