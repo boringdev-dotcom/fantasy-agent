@@ -1,1 +1,1 @@
-web: cd agent && python server.py 
+web: cd agent && python -m uvicorn server:app --host 0.0.0.0 --port $PORT 
