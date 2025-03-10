@@ -460,8 +460,9 @@ const App: React.FC = () => {
 
   const connectWebSocket = useCallback(() => {
     const sessionId = getSessionId();
-    // Use the user's WebSocket URL format with the session ID
-    const websocket = new WebSocket(`ws://localhost:8765/ws/${sessionId}`);
+    // Use the environment variable for WebSocket URL or fallback to localhost for development
+    const wsUrl = process.env.REACT_APP_WEBSOCKET_URL || 'ws://localhost:8765/ws';
+    const websocket = new WebSocket(`${wsUrl}/${sessionId}`);
 
     websocket.onopen = () => {
       console.log('Connected to WebSocket');

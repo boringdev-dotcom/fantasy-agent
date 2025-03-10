@@ -94,7 +94,7 @@ class PlayerStatsResponse(BaseModel):
     game: Game
 
 class AgentDependencies(BaseModel):
-    api_base_url: str = "http://localhost:8000"
+    api_base_url: str = "https://fantasy-webscraper.onrender.com"
     nba_api: str = "https://api.balldontlie.io/v1"
 
 model = AnthropicModel('claude-3-7-sonnet-latest', api_key=os.getenv('ANTHROPIC_API_KEY'))
