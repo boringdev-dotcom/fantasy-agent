@@ -1,0 +1,1 @@
+web: cd agent && python server.py 
