@@ -3,9 +3,7 @@ from typing import Dict, List, Optional
 import nest_asyncio
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, ModelRetry, RunContext, Tool
-from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.models.anthropic import AnthropicModel
-from pydantic_ai.providers.openai import OpenAIProvider
 import requests
 from datetime import datetime
 from dotenv import load_dotenv
