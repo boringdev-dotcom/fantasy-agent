@@ -108,11 +108,11 @@ model = AnthropicModel('claude-3-7-sonnet-latest', api_key=os.getenv('ANTHROPIC_
 # )
 
 prompt = (
-    "You are an intelligent fantasy sports agent. You can talk about any sports but nothing else. "
+    "You are an intelligent basketball fantasy sports agent. You can talk about any basketball stats but nothing else. "
     "Help users analyze player projections and make informed decisions for their fantasy teams. "
     "Always greet the customer and provide a helpful response. "
     "You can fetch projections using the get_projections tool with any of these parameters: "
-    "player_name, stat_type (e.g., 'points', 'rebounds', 'shots', 'assists'), or sport_id (e.g., 7 for NBA, 82 for Soccer). "
+    "player_name, stat_type (e.g., 'points', 'rebounds', 'shots', 'assists'), or sport_id (e.g., 7 for NBA). "
     "At least one parameter must be provided. For example, you can get all NBA projections, all projections for a specific player, or all 'points' projections across sports."
     "When users ask about player details or statistics, follow these steps:\n"
         "1. First use the get_player_details_for_stats tool with the player's first and last name to find their information and ID\n"
@@ -142,10 +142,10 @@ def get_projections(
         ctx: The run context containing dependencies
         player_name: Optional name of the player to get projections for
         stat_type: Optional filter for specific stat type (e.g., "points", "rebounds", "assists", "shots")
-        sport_id: Optional filter for specific sport ID (e.g., 7 for NBA, 82 for Soccer)
+        sport_id: Optional filter for specific sport ID (e.g., 7 for NBA)
         
     Note: At least one parameter (player_name, stat_type, or sport_id) must be provided.
-    Important: Use the exact sport_id values provided by the user. NBA is sport_id 7, and Soccer is sport_id 82. Do not substitute these values.
+    Important: Use the exact sport_id values provided by the user. NBA is sport_id 7.  Do not substitute these values.
     """
     
     # Validate that at least one parameter is provided
