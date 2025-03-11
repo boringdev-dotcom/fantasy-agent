@@ -13,6 +13,7 @@ const AppContainer = styled.div`
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  height: 100vh;
   background-color: ${props => props.theme.background};
   color: ${props => props.theme.text};
   transition: background-color 0.3s ease, color 0.3s ease;
@@ -22,7 +23,7 @@ const Header = styled.header`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 40px;
+  margin-bottom: 20px;
   border-bottom: 1px solid ${props => props.theme.border};
   padding-bottom: 15px;
 `;
@@ -85,11 +86,15 @@ const MainContent = styled.main`
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  height: calc(100% - 80px);
 `;
 
 const SearchContainer = styled.div`
   position: relative;
-  margin-bottom: 30px;
+  margin-bottom: 10px;
+  z-index: 10;
 `;
 
 const SearchInput = styled.input`
@@ -133,26 +138,26 @@ const SearchButton = styled.button`
 `;
 
 const MessageContainer = styled.div`
-  margin-top: 20px;
-  padding: 15px;
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
   background-color: ${props => props.theme.cardBackground};
   border-radius: 12px;
-  max-height: 60vh;
-  overflow-y: auto;
-  flex: 1;
   transition: background-color 0.3s ease;
+  margin-bottom: 20px;
 `;
 
-const Message = styled.div<{ isUser: boolean }>`
-  margin: 16px 0;
-  padding: 16px;
+const Message = styled.div<{ $isUser: boolean }>`
+  margin-bottom: 20px;
+  padding: 15px;
   border-radius: 12px;
-  background-color: ${props => props.isUser ? props.theme.userMessageBg : props.theme.aiMessageBg};
+  background-color: ${props => props.$isUser ? props.theme.userMessageBg : props.theme.aiMessageBg};
   color: ${props => props.theme.text};
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  position: relative;
-  max-width: 90%;
-  ${props => props.isUser ? 'margin-left: auto;' : ''}
+  max-width: 85%;
+  align-self: ${props => props.$isUser ? 'flex-end' : 'flex-start'};
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
   transition: background-color 0.3s ease, color 0.3s ease;
 `;
 
@@ -160,37 +165,33 @@ const MessageHeader = styled.div`
   display: flex;
   align-items: center;
   margin-bottom: 8px;
+  font-weight: 600;
 `;
 
-const Avatar = styled.div<{ isUser: boolean }>`
-  width: 24px;
-  height: 24px;
+const Avatar = styled.div<{ $isUser: boolean }>`
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background-color: ${props => props.isUser ? props.theme.primary : '#10b981'};
-  margin-right: 8px;
+  background-color: ${props => props.$isUser ? props.theme.primary : props.theme.success};
+  color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
   font-size: 12px;
-  font-weight: bold;
+  font-weight: 600;
+  margin-right: 8px;
 `;
 
 const MessageText = styled.div`
-  line-height: 1.5;
+  margin-top: 8px;
+  line-height: 1.6;
   white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: ${props => props.theme.text};
   
-  /* Styling for markdown elements */
-  strong {
-    font-weight: 600;
-  }
-  
-  em {
-    font-style: italic;
-  }
-  
-  h1, h2, h3 {
-    margin: 16px 0 8px;
+  h1, h2, h3, h4, h5, h6 {
+    margin-top: 16px;
+    margin-bottom: 8px;
     font-weight: 600;
   }
   
@@ -235,6 +236,20 @@ const MessageText = styled.div`
     &:hover {
       text-decoration: underline;
     }
+  }
+`;
+
+const StreamingCursor = styled.span`
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background-color: ${props => props.theme.primary};
+  margin-left: 2px;
+  animation: blink 1s step-end infinite;
+  
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
   }
 `;
 
@@ -318,6 +333,11 @@ const EmptyStateText = styled.p`
   font-size: 14px;
   max-width: 400px;
   margin: 0 auto;
+`;
+
+const FormContainer = styled.form`
+  margin-top: auto;
+  padding-top: 10px;
 `;
 
 // Utility function to safely parse markdown
@@ -411,6 +431,7 @@ interface MessageType {
   isUser: boolean;
   timestamp: number;
   sources?: string[];
+  streaming?: boolean;
 }
 
 const App: React.FC = () => {
@@ -451,7 +472,9 @@ const App: React.FC = () => {
   }, []);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   useEffect(() => {
@@ -480,13 +503,62 @@ const App: React.FC = () => {
       setIsLoading(false);
       try {
         const data = JSON.parse(event.data);
-        const newMessage: MessageType = {
-          text: data.text || data.message || event.data,
-          isUser: false,
-          timestamp: Date.now(),
-          sources: data.sources || []
-        };
-        setMessages(prev => [...prev, newMessage]);
+        
+        // Check if this is a streaming message
+        if (data.streaming) {
+          // Update the last message if it exists and is not a user message
+          setMessages(prev => {
+            const lastMessage = prev[prev.length - 1];
+            
+            // If the last message is from the user or doesn't exist, add a new message
+            if (!lastMessage || lastMessage.isUser) {
+              return [...prev, {
+                text: data.text || data.message || '',
+                isUser: false,
+                timestamp: Date.now(),
+                sources: data.sources || [],
+                streaming: true
+              }];
+            }
+            
+            // Otherwise update the last message
+            const updatedMessages = [...prev];
+            updatedMessages[updatedMessages.length - 1] = {
+              ...lastMessage,
+              text: data.text || data.message || lastMessage.text,
+              sources: data.sources || lastMessage.sources,
+              streaming: true
+            };
+            
+            return updatedMessages;
+          });
+        } else {
+          // This is a final message or a non-streaming message
+          setMessages(prev => {
+            const lastMessage = prev[prev.length - 1];
+            
+            // If the last message is streaming, update it with the final content
+            if (lastMessage && !lastMessage.isUser && lastMessage.streaming) {
+              const updatedMessages = [...prev];
+              updatedMessages[updatedMessages.length - 1] = {
+                ...lastMessage,
+                text: data.text || data.message || lastMessage.text,
+                sources: data.sources || lastMessage.sources,
+                streaming: false
+              };
+              
+              return updatedMessages;
+            }
+            
+            // Otherwise add a new message
+            return [...prev, {
+              text: data.text || data.message || event.data,
+              isUser: false,
+              timestamp: Date.now(),
+              sources: data.sources || []
+            }];
+          });
+        }
       } catch (error) {
         // If not JSON, just use the raw data
         const newMessage: MessageType = {
@@ -555,7 +627,7 @@ const App: React.FC = () => {
       <Header theme={colors}>
         <Logo theme={colors}>
           <LogoIcon theme={colors} />
-          AI Chatbot
+            Fantasy Agent
         </Logo>
         <NavLinks>
           <NavLink href="#" theme={colors}>Home</NavLink>
@@ -572,26 +644,6 @@ const App: React.FC = () => {
       </Header>
 
       <MainContent>
-        <form onSubmit={handleSubmit}>
-          <SearchContainer>
-            <SearchInput
-              type="text"
-              placeholder="What do you want to know?"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              disabled={!isConnected}
-              theme={colors}
-            />
-            <SearchButton 
-              type="submit" 
-              disabled={!isConnected || !inputValue.trim()}
-              theme={colors}
-            >
-              Ask
-            </SearchButton>
-          </SearchContainer>
-        </form>
-
         <MessageContainer theme={colors}>
           {messages.length === 0 ? (
             <EmptyState theme={colors}>
@@ -622,15 +674,15 @@ const App: React.FC = () => {
               </EmptyStateIcon>
               <EmptyStateTitle theme={colors}>Ask me anything</EmptyStateTitle>
               <EmptyStateText>
-                I can search the web and provide answers with sources. Try asking about AI, technology, science, or anything you're curious about.
+                I can help you make fantasy decisions. Try asking about players, teams, or anything you're curious about.
               </EmptyStateText>
             </EmptyState>
           ) : (
             <>
               {messages.map((message, index) => (
-                <Message key={message.timestamp + index} isUser={message.isUser} theme={colors}>
+                <Message key={message.timestamp + index} $isUser={message.isUser} theme={colors}>
                   <MessageHeader>
-                    <Avatar isUser={message.isUser} theme={colors}>
+                    <Avatar $isUser={message.isUser} theme={colors}>
                       {message.isUser ? 'U' : 'AI'}
                     </Avatar>
                     {message.isUser ? 'You' : 'AI Assistant'}
@@ -641,6 +693,9 @@ const App: React.FC = () => {
                     }} 
                     theme={colors}
                   />
+                  {message.streaming && (
+                    <StreamingCursor theme={colors} />
+                  )}
                   
                   {message.sources && message.sources.length > 0 && (
                     <SourcesContainer>
@@ -660,6 +715,26 @@ const App: React.FC = () => {
             </>
           )}
         </MessageContainer>
+
+        <FormContainer onSubmit={handleSubmit}>
+          <SearchContainer>
+            <SearchInput
+              type="text"
+              placeholder="What do you want to know?"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              disabled={!isConnected}
+              theme={colors}
+            />
+            <SearchButton 
+              type="submit" 
+              disabled={!isConnected || !inputValue.trim()}
+              theme={colors}
+            >
+              Ask
+            </SearchButton>
+          </SearchContainer>
+        </FormContainer>
       </MainContent>
 
       <Footer theme={colors}>
