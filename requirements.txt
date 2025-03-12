@@ -3,6 +3,6 @@ uvicorn==0.23.2
 websockets==11.0.3
 pydantic>=2.10.0,<3.0.0
 python-dotenv==1.0.0
-pydantic-ai==0.0.31
+pydantic-ai==0.0.35
 requests>=2.32.3
 nest-asyncio>=1.5.6 
