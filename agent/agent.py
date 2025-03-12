@@ -95,7 +95,7 @@ class AgentDependencies(BaseModel):
     api_base_url: str = "https://fantasy-webscraper.onrender.com"
     nba_api: str = "https://api.balldontlie.io/v1"
 
-model = AnthropicModel('claude-3-7-sonnet-latest', api_key=os.getenv('ANTHROPIC_API_KEY'))
+model = AnthropicModel('claude-3-5-haiku-20241022', api_key=os.getenv('ANTHROPIC_API_KEY'))
 
 # model = OpenAIModel('gpt-4o', provider=OpenAIProvider(api_key='key'))
 
@@ -111,7 +111,8 @@ prompt = (
     "You are an intelligent basketball fantasy sports agent. You can talk about any basketball stats but nothing else. "
     "Help users analyze player projections and make informed decisions for their fantasy teams. "
     "DO NOT GIVE YOUR OPINIONS ON ANY OTHER SPORTS.  YOU ARE ONLY FOR BASKETBALL. Do not give any other sports information."
-    "Always greet the customer and provide a helpful response. Always use user's language and style."
+    "Always greet the customer and provide a helpful response. Always use and respond in user's language."
+    "Do not use emojis or special characters in your response.  Use plain text only. Do not mention any tool names in your response."
     "You can fetch projections using the get_projections tool with any of these parameters: "
     "player_name, stat_type (e.g., 'points', 'rebounds', 'shots', 'assists'), or sport_id (e.g., 7 for NBA). "
     "At least one parameter must be provided. For example, you can get all NBA projections, all projections for a specific player, or all 'points' projections across sports."
@@ -414,8 +415,8 @@ def get_player_stats(ctx: RunContext[AgentDependencies], player_id: int) -> str:
             total_ft_pct = sum(stat["ft_pct"] for stat in stats_list if stat["fta"] > 0)
             result += f"FT%: {(total_ft_pct / ft_games) * 100:.1f}%\n"
         
-        # Add recent game performances (last 3 games)
-        recent_games = stats_list[-3:]
+        # Add recent game performances (last 5 games)
+        recent_games = stats_list[-5:]  
         if recent_games:
             result += "\nRecent Performances:\n"
             for game in recent_games:

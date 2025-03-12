@@ -5,49 +5,46 @@ export type ThemeMode = 'light' | 'dark';
 
 // Define theme colors
 export interface ThemeColors {
-  background: string;
-  text: string;
   primary: string;
   secondary: string;
-  border: string;
+  background: string;
   cardBackground: string;
+  text: string;
+  border: string;
+  inputBackground: string;
   userMessageBg: string;
   aiMessageBg: string;
-  inputBackground: string;
-  footerBackground: string;
-  success: string;
-  error: string;
+  toolCallBg: string;
+  toolResultBg: string;
 }
 
 // Theme definitions
 export const themes: Record<ThemeMode, ThemeColors> = {
   light: {
-    background: '#f9fafb',
-    text: '#1a1a1a',
     primary: '#2563eb',
-    secondary: '#4b5563',
-    border: '#e0e0e0',
-    cardBackground: '#f8f9fa',
-    userMessageBg: '#e9f5ff',
-    aiMessageBg: '#ffffff',
+    secondary: '#64748b',
+    background: '#f8fafc',
+    cardBackground: '#ffffff',
+    text: '#1e293b',
+    border: '#e2e8f0',
     inputBackground: '#ffffff',
-    footerBackground: '#ffffff',
-    success: '#22c55e',
-    error: '#ef4444'
+    userMessageBg: '#e2e8f0',
+    aiMessageBg: '#f1f5f9',
+    toolCallBg: '#e0f2fe',
+    toolResultBg: '#dbeafe'
   },
   dark: {
-    background: '#111827',
-    text: '#f3f4f6',
     primary: '#3b82f6',
-    secondary: '#9ca3af',
-    border: '#374151',
-    cardBackground: '#1f2937',
-    userMessageBg: '#1e3a8a',
-    aiMessageBg: '#1f2937',
-    inputBackground: '#1f2937',
-    footerBackground: '#1f2937',
-    success: '#10b981',
-    error: '#ef4444'
+    secondary: '#94a3b8',
+    background: '#0f172a',
+    cardBackground: '#1e293b',
+    text: '#f1f5f9',
+    border: '#334155',
+    inputBackground: '#1e293b',
+    userMessageBg: '#334155',
+    aiMessageBg: '#1e293b',
+    toolCallBg: '#0c4a6e',
+    toolResultBg: '#172554'
   }
 };
 

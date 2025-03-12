@@ -340,6 +340,26 @@ const FormContainer = styled.form`
   padding-top: 10px;
 `;
 
+const ToolCallInfo = styled.div`
+  margin-top: 10px;
+  padding: 8px;
+  border-radius: 8px;
+  background-color: ${props => props.theme.toolCallBg || '#2a2a2a'};
+  font-family: monospace;
+  font-size: 0.9em;
+  overflow-x: auto;
+`;
+
+const ToolResultInfo = styled.div`
+  margin-top: 10px;
+  padding: 8px;
+  border-radius: 8px;
+  background-color: ${props => props.theme.toolResultBg || '#1a1a1a'};
+  font-family: monospace;
+  font-size: 0.9em;
+  overflow-x: auto;
+`;
+
 // Utility function to safely parse markdown
 const parseMarkdown = (text: string): string => {
   if (!text) return '';
@@ -432,6 +452,14 @@ interface MessageType {
   timestamp: number;
   sources?: string[];
   streaming?: boolean;
+  tool_call?: {
+    name: string;
+    arguments: any;
+  };
+  tool_result?: {
+    name: string;
+    result: string;
+  };
 }
 
 const App: React.FC = () => {
@@ -513,11 +541,13 @@ const App: React.FC = () => {
             // If the last message is from the user or doesn't exist, add a new message
             if (!lastMessage || lastMessage.isUser) {
               return [...prev, {
-                text: data.text || data.message || '',
+                text: data.text || '',
                 isUser: false,
                 timestamp: Date.now(),
                 sources: data.sources || [],
-                streaming: true
+                streaming: true,
+                tool_call: data.tool_call,
+                tool_result: data.tool_result
               }];
             }
             
@@ -525,9 +555,11 @@ const App: React.FC = () => {
             const updatedMessages = [...prev];
             updatedMessages[updatedMessages.length - 1] = {
               ...lastMessage,
-              text: data.text || data.message || lastMessage.text,
+              text: data.text || lastMessage.text,
               sources: data.sources || lastMessage.sources,
-              streaming: true
+              streaming: true,
+              tool_call: data.tool_call || lastMessage.tool_call,
+              tool_result: data.tool_result || lastMessage.tool_result
             };
             
             return updatedMessages;
@@ -542,9 +574,11 @@ const App: React.FC = () => {
               const updatedMessages = [...prev];
               updatedMessages[updatedMessages.length - 1] = {
                 ...lastMessage,
-                text: data.text || data.message || lastMessage.text,
+                text: data.text || lastMessage.text,
                 sources: data.sources || lastMessage.sources,
-                streaming: false
+                streaming: false,
+                tool_call: data.tool_call || lastMessage.tool_call,
+                tool_result: data.tool_result || lastMessage.tool_result
               };
               
               return updatedMessages;
@@ -555,7 +589,9 @@ const App: React.FC = () => {
               text: data.text || data.message || event.data,
               isUser: false,
               timestamp: Date.now(),
-              sources: data.sources || []
+              sources: data.sources || [],
+              tool_call: data.tool_call,
+              tool_result: data.tool_result
             }];
           });
         }
@@ -693,6 +729,21 @@ const App: React.FC = () => {
                     }} 
                     theme={colors}
                   />
+                  
+                  {message.tool_call && (
+                    <ToolCallInfo theme={colors}>
+                      <strong>Tool Call:</strong> {message.tool_call.name}
+                      <pre>{JSON.stringify(message.tool_call.arguments, null, 2)}</pre>
+                    </ToolCallInfo>
+                  )}
+                  
+                  {message.tool_result && (
+                    <ToolResultInfo theme={colors}>
+                      <strong>Tool Result:</strong> {message.tool_result.name}
+                      <pre>{message.tool_result.result}</pre>
+                    </ToolResultInfo>
+                  )}
+                  
                   {message.streaming && (
                     <StreamingCursor theme={colors} />
                   )}
