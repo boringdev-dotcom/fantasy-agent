@@ -14,17 +14,17 @@ load_dotenv()
 
 # Define Pydantic models for the API response
 class PlayerProjection(BaseModel):
-    id: str
-    player_id: str
-    player_name: str
-    sport_id: int
-    sport_name: str
-    game_id: str
-    stat_type: str
-    line_score: float
-    description: str
-    start_time: datetime
-    is_active: bool
+    id: Optional[str] = None
+    player_id: Optional[str] = None
+    player_name: Optional[str] = None
+    sport_id: Optional[int] = None
+    sport_name: Optional[str] = None
+    game_id: Optional[str] = None
+    stat_type: Optional[str] = None
+    line_score: Optional[float] = None
+    description: Optional[str] = None
+    start_time: Optional[datetime] = None
+    is_active: Optional[bool] = None
     opponent: Optional[str] = None
 
 class PlayerDetailsForStats(BaseModel):
@@ -116,6 +116,8 @@ prompt = (
     "You can fetch projections using the get_projections tool with any of these parameters: "
     "player_name, stat_type (e.g., 'points', 'rebounds', 'shots', 'assists'), or sport_id (e.g., 7 for NBA). "
     "At least one parameter must be provided. For example, you can get all NBA projections, all projections for a specific player, or all 'points' projections across sports."
+    "The projections are paginated, with 50 results per page by default. If there are more results available, inform the user and ask if they want to see more. "
+    "If the user asks for more projections, use the page parameter to fetch the next page of results."
     "When users ask about player details or statistics, follow these steps:\n"
         "1. First use the get_player_details_for_stats tool with the player's first and last name to find their information and ID\n"
         "2. Then use the get_player_stats tool with that ID to fetch their detailed statistics for the current season\n"
@@ -136,7 +138,9 @@ def get_projections(
     ctx: RunContext[AgentDependencies], 
     player_name: Optional[str] = None,
     stat_type: Optional[str] = None,
-    sport_id: Optional[int] = None
+    sport_id: Optional[int] = None,
+    page: int = 1,
+    page_size: int = 50
 ) -> str:
     """Get the projections for players by making an API call
     
@@ -145,9 +149,11 @@ def get_projections(
         player_name: Optional name of the player to get projections for
         stat_type: Optional filter for specific stat type (e.g., "points", "rebounds", "assists", "shots")
         sport_id: Optional filter for specific sport ID (e.g., 7 for NBA)
+        page: Page number for pagination (default: 1)
+        page_size: Number of results per page (default: 50)
         
     Note: At least one parameter (player_name, stat_type, or sport_id) must be provided.
-    Important: Use the exact sport_id values provided by the user. NBA is sport_id 7.  Do not substitute these values.
+    Important: Use the exact sport_id values provided by the user. NBA is sport_id 7. Do not substitute these values.
     """
     
     # Validate that at least one parameter is provided
@@ -165,7 +171,10 @@ def get_projections(
 
     try:
         # Build query parameters including only the provided filters
-        params = {}
+        params = {
+            "page": page,
+            "page_size": page_size
+        }
         if player_name is not None:
             params["player_name"] = player_name
         if stat_type is not None:
@@ -179,15 +188,21 @@ def get_projections(
         response.raise_for_status()  # Raise an exception for 4XX/5XX responses
         
         data = response.json()
-        print(f"Response data: {data}")
+        print(f"Response data structure: {list(data.keys())}")
+        
+        # Parse the new paginated response structure
+        projections_data = data.get("items", [])
+        pagination = data.get("pagination", {})
+
+        print(f"Projections data: {projections_data}")
         
         # Parse the response into PlayerProjection objects
-        projections = [PlayerProjection(**item) for item in data]
-        
+        projections = [PlayerProjection(**item) for item in projections_data]
+        print(f"Projections: {projections}")
         if not projections:
             return f"No projections found for {filter_str}."
         
-       # Format the response in a readable way
+        # Format the response in a readable way
         # Construct a title based on the provided parameters
         result_title = "Projections"
         filter_parts = []
@@ -200,7 +215,14 @@ def get_projections(
 
         if filter_parts:
             result_title += f" for {', '.join(filter_parts)}"
-        result = f"{result_title}:\n"
+        
+        # Add pagination information
+        current_page = pagination.get("page", 1)
+        total_pages = pagination.get("total_pages", 1)
+        total_count = pagination.get("total_count", len(projections))
+        has_next = pagination.get("has_next", False)
+        
+        result = f"{result_title} (Page {current_page} of {total_pages}, showing {len(projections)} of {total_count} total):\n\n"
 
         for proj in projections:
             result += f"- {proj.player_name}: {proj.stat_type} = {proj.line_score} ({proj.description})\n"
@@ -208,6 +230,14 @@ def get_projections(
             if proj.opponent:
                 result += f"  Opponent: {proj.opponent}\n"
             result += "\n"
+        
+        
+
+        # Add information about more results if available
+        if has_next:
+            next_page = current_page + 1
+            result += f"\nThere are more projections available. To see the next page, ask for 'more projections' or specify 'page {next_page}'."
+        
         return result
     except Exception as e:       
         return f"Error fetching projections for {filter_str}: {str(e)}"
