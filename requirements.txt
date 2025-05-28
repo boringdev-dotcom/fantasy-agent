@@ -1,8 +1,15 @@
+# Web framework and server
 fastapi==0.115.12
 uvicorn==0.23.2
 websockets==11.0.3
+
+# Data validation and modeling
 pydantic>=2.10.0,<3.0.0
-python-dotenv==1.0.0
 pydantic-ai==0.2.4
+
+# Environment and HTTP
+python-dotenv==1.0.0
 requests>=2.32.3
+
+# Async support
 nest-asyncio>=1.5.6 

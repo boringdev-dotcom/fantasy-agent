@@ -1,3 +1,17 @@
+# /// script
+# dependencies = [
+#   "requests<3",
+#   "rich",
+#   "pydantic>=2.10.0,<3.0.0",
+#   "pydantic-ai==0.2.4",
+#   "python-dotenv==1.0.0",
+#   "nest-asyncio>=1.5.6",
+#   "fastapi==0.115.12",
+#   "uvicorn==0.23.2",
+#   "websockets==11.0.3"
+# ]
+# ///
+
 import os
 from typing import Dict, List, Optional
 import nest_asyncio
@@ -8,6 +22,11 @@ import requests
 from datetime import datetime
 from dotenv import load_dotenv
 import traceback
+from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
+
+
+from pydantic_ai.mcp import MCPServerStdio
 
 nest_asyncio.apply()
 load_dotenv()
@@ -95,7 +114,19 @@ class AgentDependencies(BaseModel):
     api_base_url: str = "https://fantasy-webscraper.onrender.com"
     nba_api: str = "https://api.balldontlie.io/v1"
 
-model = AnthropicModel('claude-3-5-haiku-20241022', api_key=os.getenv('ANTHROPIC_API_KEY'))
+model = AnthropicModel(
+    'claude-3-7-sonnet-latest', provider=AnthropicProvider(api_key=os.getenv('ANTHROPIC_API_KEY'))
+)
+
+mongo_server = MCPServerStdio(
+    'npx', 
+    args=[
+        "-y", 
+        "mongodb-mcp-server",
+        "--connectionString", 
+        "mongodb://localhost:27017/"  # Direct connection string instead of using env var
+    ]
+)
 
 # model = OpenAIModel('gpt-4o', provider=OpenAIProvider(api_key='key'))
 
@@ -113,11 +144,11 @@ prompt = (
     "DO NOT GIVE YOUR OPINIONS ON ANY OTHER SPORTS.  YOU ARE ONLY FOR BASKETBALL. Do not give any other sports information."
     "Always greet the customer and provide a helpful response. Always use and respond in user's language."
     "Do not use emojis or special characters in your response.  Use plain text only. Do not mention any tool names in your response."
-    "You can fetch projections using the get_projections tool with any of these parameters: "
+    "You can fetch projections using the MCP to query the MongoDB database for projection data. You can filter projections by: "
     "player_name, stat_type (e.g., 'points', 'rebounds', 'shots', 'assists'), or sport_id (e.g., 7 for NBA). "
-    "At least one parameter must be provided. For example, you can get all NBA projections, all projections for a specific player, or all 'points' projections across sports."
+    "At least one parameter must be provided in your MCP query. For example, you can get all NBA projections, all projections for a specific player, or all 'points' projections across sports."
     "The projections are paginated, with 50 results per page by default. If there are more results available, inform the user and ask if they want to see more. "
-    "If the user asks for more projections, use the page parameter to fetch the next page of results."
+    "If the user asks for more projections, use the pagination parameters in your MCP query to fetch the next page of results."
     "When users ask about player details or statistics, follow these steps:\n"
         "1. First use the get_player_details_for_stats tool with the player's first and last name to find their information and ID\n"
         "2. Then use the get_player_stats tool with that ID to fetch their detailed statistics for the current season\n"
@@ -130,117 +161,11 @@ agent = Agent(
     model=model,
     deps_type=AgentDependencies,
     retries=3,
-    system_prompt=prompt
+    system_prompt=prompt,
+    mcp_servers=[mongo_server]
 )
 
-@agent.tool
-def get_projections(
-    ctx: RunContext[AgentDependencies], 
-    player_name: Optional[str] = None,
-    stat_type: Optional[str] = None,
-    sport_id: Optional[int] = None,
-    page: int = 1,
-    page_size: int = 50
-) -> str:
-    """Get the projections for players by making an API call
-    
-    Args:
-        ctx: The run context containing dependencies
-        player_name: Optional name of the player to get projections for
-        stat_type: Optional filter for specific stat type (e.g., "points", "rebounds", "assists", "shots")
-        sport_id: Optional filter for specific sport ID (e.g., 7 for NBA)
-        page: Page number for pagination (default: 1)
-        page_size: Number of results per page (default: 50)
-        
-    Note: At least one parameter (player_name, stat_type, or sport_id) must be provided.
-    Important: Use the exact sport_id values provided by the user. NBA is sport_id 7. Do not substitute these values.
-    """
-    
-    # Validate that at least one parameter is provided
-    if player_name is None and stat_type is None and sport_id is None:
-        return "Error: At least one parameter (player_name, stat_type, or sport_id) must be provided."
-    
-    filter_msg = []
-    if player_name:
-       filter_msg.append(f"player '{player_name}'")
-    if stat_type:
-        filter_msg.append(f"stat type '{stat_type}'")
-    if sport_id:
-        filter_msg.append(f"sport ID {sport_id}")
-    filter_str = ", ".join(filter_msg)
 
-    try:
-        # Build query parameters including only the provided filters
-        params = {
-            "page": page,
-            "page_size": page_size
-        }
-        if player_name is not None:
-            params["player_name"] = player_name
-        if stat_type is not None:
-            params["stat_type"] = stat_type
-        if sport_id is not None:
-            params["sport_id"] = sport_id
-            
-        print(f"Getting projections with params: {params}")
-        api_url = f"{ctx.deps.api_base_url}/api/projections"
-        response = requests.get(api_url, params=params)
-        response.raise_for_status()  # Raise an exception for 4XX/5XX responses
-        
-        data = response.json()
-        print(f"Response data structure: {list(data.keys())}")
-        
-        # Parse the new paginated response structure
-        projections_data = data.get("items", [])
-        pagination = data.get("pagination", {})
-
-        print(f"Projections data: {projections_data}")
-        
-        # Parse the response into PlayerProjection objects
-        projections = [PlayerProjection(**item) for item in projections_data]
-        print(f"Projections: {projections}")
-        if not projections:
-            return f"No projections found for {filter_str}."
-        
-        # Format the response in a readable way
-        # Construct a title based on the provided parameters
-        result_title = "Projections"
-        filter_parts = []
-        if player_name:
-            filter_parts.append(f"player: {player_name}")
-        if stat_type:
-            filter_parts.append(f"stat type: {stat_type}")
-        if sport_id:
-            filter_parts.append(f"sport ID: {sport_id}")
-
-        if filter_parts:
-            result_title += f" for {', '.join(filter_parts)}"
-        
-        # Add pagination information
-        current_page = pagination.get("page", 1)
-        total_pages = pagination.get("total_pages", 1)
-        total_count = pagination.get("total_count", len(projections))
-        has_next = pagination.get("has_next", False)
-        
-        result = f"{result_title} (Page {current_page} of {total_pages}, showing {len(projections)} of {total_count} total):\n\n"
-
-        for proj in projections:
-            result += f"- {proj.player_name}: {proj.stat_type} = {proj.line_score} ({proj.description})\n"
-            result += f"  Game starts: {proj.start_time.strftime('%Y-%m-%d %H:%M')}\n"
-            if proj.opponent:
-                result += f"  Opponent: {proj.opponent}\n"
-            result += "\n"
-        
-        
-
-        # Add information about more results if available
-        if has_next:
-            next_page = current_page + 1
-            result += f"\nThere are more projections available. To see the next page, ask for 'more projections' or specify 'page {next_page}'."
-        
-        return result
-    except Exception as e:       
-        return f"Error fetching projections for {filter_str}: {str(e)}"
     
 @agent.tool 
 def get_player_details_for_stats(ctx: RunContext[AgentDependencies], first_name: str, last_name: str) -> str:
